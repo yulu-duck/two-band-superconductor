@@ -171,7 +171,7 @@ def ChiMatsu(temperature,Delta_h,Delta_e,Gamma):
     n=0;
     #The sum should go from -infty to infty
 
-    for n in range(-max_it,max_it):
+    for n in range(-max_it(temperature),max_it(temperature)):
         omega = omegaMatsu(n,temperature);
         #Find renormalised omega and Delta_h, Delta_e
         Tildes, _, _ = SigmaCorrections(omega,Delta_h,Delta_e,Gamma);

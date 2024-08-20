@@ -13,7 +13,11 @@ omega_arr_fine = np.arange(-Omega_c,Omega_c,step)
 initD = [1,-1]
 
 #Now extend to two gaps, s+-
-max_it = 100000
+# max_it = 10000
+def max_it(temperature):
+    omega_max = 6280 # maximum Matsubara frequency
+    maxit_lowT = omega_max / (2 * np.pi * temperature)# include more terms in low T
+    return int(np.maximum(10000,maxit_lowT))
 beta = 1.74
 
 Vhe=200;
