@@ -316,7 +316,7 @@ def padecoeffs(z,u):
     return a
 
 def padeeval(z_vec,z_arr,a):
-    #Calculate Pade approximation at point z, given the data points z_arr and the coefficients a
+    #Calculate Pade approximation at point z_vec, given the data points z_arr and the coefficients a
 
     if not isinstance(z_vec, (list, tuple, np.ndarray)): z_vec = np.array([z_vec])
     N = len(a);
