@@ -203,7 +203,18 @@ def find_best_Pade_params(N_FPade, FPade_dict: dict):
     # If no such key exists, print an error message
     print(f"A larger Pade decomposition cutoff {N_FPade} is needed, currently only {N_arr[-1]} is available")
 
-def SolveGap_FPade(DeltaOut,temperature,Gamma,N_FPade):
+def SolveGap_FPade(DeltaOut,temperature,Gamma,smartTruncate = True):
+    # WARNING: convergence only guaranteed for T > 1mK and Gamma < 0.16
+    if temperature < 1e-3 or Gamma > 0.16:
+        print('Convergence to 1e-6 is not guaranteed')
+    N_FPade_safe = 1000 # a safe value which gurentees 1e-6 relative precision for T > 1mK and Gamma < 0.16. 
+    if smartTruncate: # smartTruncate allows the Pade decomposition to truncate at earlier terms for elevated termperatures
+        if temperature > 0.1:
+            N_FPade = 50
+        else: # a linear scaling in beta: N = 50 when T = 0.1 and N = 400 when T = 0.1
+            N_FPade = np.minimum(50 + (0.10/temperature - 1) * 7,400)
+    else:
+        N_FPade = N_FPade_safe
     # returns the unnormalised gaps DeltaOut and renormalised gaps Tildes given an initial guess of unnormalised gaps; with a cutoff N_FPade in the Pade-decomposed Matsubara summation
 
     try:
@@ -343,6 +354,7 @@ def generate_FPade_poles_and_weights(FPade_maxN_list):
         # Store results in the dictionary
         result = np.array([filtered_poles, filtered_residues])
         FPade_params_dict[str(N)] = result
+        print(f'Completed generating {N}')
     
     # Save the dictionary to a file
     np.save('FPade_Poles_and_Weights.npy', FPade_params_dict)
