@@ -9,7 +9,15 @@ from scipy.integrate import quad, simpson
 from const import *
 from scipy.interpolate import interp1d, interp2d, UnivariateSpline
 from cfr import CFR # module to compute the Pade Decomposition of FD function
-
+import os 
+curr_dir = os.path.dirname(os.path.realpath(__file__))
+def closest_values(arr1, arr2, val):
+    # Compute the absolute difference for each value in val against all elements in arr1
+    diff = np.abs(arr1[:, np.newaxis] - val)
+    # Find the indices of the minimal differences for each value in val
+    indices = diff.argmin(axis=0)
+    # Use the indices to retrieve corresponding elements from arr2
+    return arr2[indices]
 def f_FD(T,w):
     if w/T > 700: return 0 #This is to prevent overflows of np.exp(). Not necessary, but avoids RuntimeWarnings.
     else: return 1/(1+np.exp(w/T))
@@ -203,25 +211,61 @@ def find_best_Pade_params(N_FPade, FPade_dict: dict):
     # If no such key exists, print an error message
     print(f"A larger Pade decomposition cutoff {N_FPade} is needed, currently only {N_arr[-1]} is available")
 
-def SolveGap_FPade(DeltaOut,temperature,Gamma,smartTruncate = True):
-    # WARNING: convergence only guaranteed for T > 1mK and Gamma < 0.16
-    if temperature < 1e-3 or Gamma > 0.16:
-        print('Convergence to 1e-6 is not guaranteed')
-    N_FPade_safe = 1000 # a safe value which gurentees 1e-6 relative precision for T > 1mK and Gamma < 0.16. 
-    if smartTruncate: # smartTruncate allows the Pade decomposition to truncate at earlier terms for elevated termperatures
-        if temperature > 0.1:
-            N_FPade = 50
-        else: # a linear scaling in beta: N = 50 when T = 0.1 and N = 400 when T = 0.1
-            N_FPade = np.minimum(50 + (0.10/temperature - 1) * 7,400)
-    else:
-        N_FPade = N_FPade_safe
-    # returns the unnormalised gaps DeltaOut and renormalised gaps Tildes given an initial guess of unnormalised gaps; with a cutoff N_FPade in the Pade-decomposed Matsubara summation
-
-    try:
+def sum_FPade(func, temperature, N_FPade,args = ()):
+    # WARNING: The result is generally complex. Need to recast it into real by np.real() in many cases.
+    # summation using Pade decomposition for an arbitrary function func whose first argument is the Matsubara frequency, the rest of the arguments goes to args
+    try: # if running in IPython environment
         FPade_dict = np.load('FPade_Poles_and_Weights.npy',allow_pickle=True).item()
     except:
-        FPade_maxN_list = np.array([5,10,15,20,25,30,35,40,45,50,60,70,80,90,100,120,150,200,500,1000])
-        FPade_dict = generate_FPade_poles_and_weights(FPade_maxN_list)
+        try: # if running in Python environment
+            FPade_dict = np.load(curr_dir+'/FPade_Poles_and_Weights.npy',allow_pickle=True).item()
+        except: # if the lookup table for weights and poles hasn't been generated before. This only works in IPython environments.
+            print('Could not find pole and weights for Pade decomposition. Generating weights and poles...')
+            FPade_maxN_list = np.array([5,10,15,20,25,30,35,40,45,50,60,70,80,90,100,120,150,200,500,1000])
+            FPade_dict = generate_FPade_poles_and_weights(FPade_maxN_list)
+            print('Weights and Poles generated and saved.')
+    positive_poles, weights, = find_best_Pade_params(N_FPade, FPade_dict)
+
+    omega = positive_poles*temperature
+    try: # if the function is vectorisable
+        return np.sum(func(omega, *args) * weights)
+    except: # else, do a for loop to sum over each term
+        summed = 0
+        for i in range(len(positive_poles)):
+            pole = positive_poles[i]
+            weight = weights[i]
+            omega = pole * temperature
+
+            summand = func(omega,*args) * weight
+            summed += summand
+
+def SolveGap_FPade(DeltaOut,temperature,Gamma,smartTruncate = True, N_FPade = None):
+    # WARNING: convergence only guaranteed for T > 1mK and Gamma < 0.16
+    """
+    if temperature < 1e-3 or Gamma > 0.16:
+        print('Convergence to 1e-6 is not guaranteed')
+    """ 
+    if N_FPade == None:
+        N_FPade_safe = 1000 # a safe value which gurentees 1e-6 relative precision for T > 1mK and Gamma < 0.16. 
+        if smartTruncate: # smartTruncate allows the Pade decomposition to truncate at earlier terms for elevated termperatures
+            if temperature > 0.1:
+                N_FPade = 50
+            else: # a linear scaling in beta: N = 50 when T = 0.1 and N = 400 when T = 0.1
+                N_FPade = np.minimum(50 + (0.10/temperature - 1) * 7,400)
+        else:
+            N_FPade = N_FPade_safe
+    # returns the unnormalised gaps DeltaOut and renormalised gaps Tildes given an initial guess of unnormalised gaps; with a cutoff N_FPade in the Pade-decomposed Matsubara summation
+
+    try: # if running in IPython environment
+        FPade_dict = np.load('FPade_Poles_and_Weights.npy',allow_pickle=True).item()
+    except:
+        try: # if running in Python environment
+            FPade_dict = np.load(curr_dir+'/FPade_Poles_and_Weights.npy',allow_pickle=True).item()
+        except:
+            print('Could not find pole and weights for Pade decomposition. Generating weights and poles...')
+            FPade_maxN_list = np.array([5,10,15,20,25,30,35,40,45,50,60,70,80,90,100,120,150,200,500,1000])
+            FPade_dict = generate_FPade_poles_and_weights(FPade_maxN_list)
+            print('Weights and Poles generated and saved.')
     positive_poles, weights, = find_best_Pade_params(N_FPade, FPade_dict)
     
     # Bang equations (7)
@@ -497,7 +541,6 @@ def pade(x_fine,x,y):
     # Evalaute the Pade approximant at x_fine, given values at (x,y) in the complex plane
     a = padecoeffs(x, y)
     return padeeval(x_fine,x,a)
-
 
 # def padeeval(z_vec,z_arr,a):
 #     #Calculate Pade approximation at point z, given the data points z_arr and the coefficients a
