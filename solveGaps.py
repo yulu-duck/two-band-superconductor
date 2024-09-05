@@ -11,7 +11,7 @@ curr_dir = os.path.dirname(os.path.realpath(__file__))
 The script calculates and stores results of the gap equations with impurity.
 """
 savePlot = True
-Gamma_arr = np.linspace(0,0.45,20)
+Gamma_arr = np.linspace(0.14,0.45,10)
 Tc_imp_arr = np.loadtxt(curr_dir+'/Tc.txt')
 Tmin = 0.01
 T_len = 80
@@ -33,7 +33,7 @@ for i in range(len(Gamma_arr)): # smart guess
         else:
             gapGuess = DeltaOut_list[-1]
         
-        DeltaOut, TildesTotal = SolveGap_FPade(gapGuess,T_eval,Gamma)
+        DeltaOut, TildesTotal = SolveGap_FPade(initD,T_eval,Gamma,N_FPade=1000)
         DeltaOut_list.append(DeltaOut)
         # save the results
         Delta_e, Delta_h = DeltaOut
@@ -43,14 +43,13 @@ for i in range(len(Gamma_arr)): # smart guess
     if savePlot:
         Delta_h_list = np.array(save_df.iloc[i*T_len:(i+1)*T_len]['Delta_h'])
         Delta_e_list = np.array(save_df.iloc[i*T_len:(i+1)*T_len]['Delta_e'])
-        print(Delta_h_list)
         T_normalised_list = np.array(save_df.iloc[i*T_len:(i+1)*T_len]['T/Tc'])
-        plt.plot(T_normalised_list,Delta_h_list,label = 'holes')
-        plt.plot(T_normalised_list,Delta_e_list,label = 'electrons')
+        plt.plot(T_normalised_list,Delta_h_list,'+',label = 'holes')
+        plt.plot(T_normalised_list,Delta_e_list,'+',label = 'electrons')
         plt.xlabel('T/Tc')
         plt.ylabel('Delta')
         plt.title(f'Gap sizes for Gamma = {Gamma:.2f}')
-        plt.savefig(curr_dir+f'/Gaps_Data/gaps_{i}.pdf'); plt.close()
+        plt.savefig(curr_dir+f'/Gaps_Data/gaps_long_{i}.pdf'); plt.close()
     if i%5 == 0:
         end_time = time.time()
         formatted_time = str(timedelta(seconds= (end_time - start_time)))
@@ -58,5 +57,5 @@ for i in range(len(Gamma_arr)): # smart guess
 
 
 # Save the DataFrame to a text file
-output_file = curr_dir+'/Gaps_Data/gaps_test.txt'
+output_file = curr_dir+'/Gaps_Data/gaps_test_long.txt'
 save_df.to_csv(output_file, sep='\t', index=False, header=True)

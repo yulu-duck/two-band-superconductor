@@ -320,10 +320,10 @@ def SigmaCorrections(omega,Delta_h,Delta_e,Gamma):
     Eqn = lambda Tildes: np.array([Tildes[0]-omegatilde_cons(omega,Tildes),Tildes[1]-Deltatilde_h_cons(Delta_h,Tildes),Tildes[2]-Deltatilde_e_cons(Delta_e,Tildes)])
 
     TildesOut = fsolve(Eqn,[omega,Delta_h,Delta_e],xtol=1e-12);
-    G = np.array([[G_h_0(TildesOut), G_h_1(TildesOut)],[ G_e_0(TildesOut), G_e_1(TildesOut)]])
+    G_res = np.array([[G_h_0(TildesOut), G_h_1(TildesOut)],[ G_e_0(TildesOut), G_e_1(TildesOut)]])
     Sigma = np.array([[sigma_h_0(TildesOut,Gamma), sigma_h_1(TildesOut,Gamma)],[sigma_e_0(TildesOut,Gamma), sigma_e_1(TildesOut,Gamma)]]);
 
-    return TildesOut, G, Sigma
+    return TildesOut, G_res, Sigma
 
 def generate_FPade_poles_and_weights(FPade_maxN_list):
     """
@@ -405,7 +405,14 @@ def generate_FPade_poles_and_weights(FPade_maxN_list):
     
     return FPade_params_dict
 
-'''
+def unnormalised_Delta_from_tildes(tildes, Gamma):
+    # return Delta_e and Delta_h from a 1*3 array of [omega_tilde, Deltatilde_h, Deltatilde_e] under impurity level Gamma
+    omega_tilde, Deltatilde_h, Deltatilde_e = tildes
+    Delta_h = Deltatilde_h - sigma_h_1(tildes, Gamma) - sigma_e_1(tildes, Gamma)
+    Delta_e = Deltatilde_e - sigma_h_1(tildes, Gamma) - sigma_e_1(tildes, Gamma) 
+    omega_n = omega_tilde - sigma_h_0(tildes, Gamma) - sigma_h_0(tildes, Gamma)
+    return omega_n, Delta_h, Delta_e
+
 def sqrtM(M):
     A = M[0,0]; B = M[0,1]; C = M[1,0]; D = M[1,1]
     assert (np.sqrt(A**2+B**2) > -A),"This will result in a singular square root!"
@@ -418,7 +425,7 @@ def sqrtM(M):
 def M(re,im):
     return np.array([[re,-im],[im,re]])
 
-def SigmaCorrections_complex(omega,Delta_h,Delta_e):
+def SigmaCorrections_complex(omega,Delta_h,Delta_e,Gamma):
     #Work out the renormalisation shifts of omega and Delta
     #These are the modified frequencies and gap values
 
@@ -458,41 +465,34 @@ def SigmaCorrections_complex(omega,Delta_h,Delta_e):
     #TildesOut = fsolve(Eqn,[np.real(omega),np.imag(omega),np.real(Delta_h),np.imag(Delta_h),np.real(Delta_e),np.imag(Delta_e)],xtol=1e-12)
     TildesOut = root(Eqn,[np.real(omega),np.imag(omega),np.real(Delta_h),np.imag(Delta_h),np.real(Delta_e),np.imag(Delta_e)],method='lm').x
 
-    G = np.array([[G_h_0(TildesOut)[0][0] + 1j*G_h_0(TildesOut)[1][0], G_h_1(TildesOut)[0][0] + 1j*G_h_1(TildesOut)[1][0]],[ G_e_0(TildesOut)[0][0] + 1j*G_e_0(TildesOut)[1][0], G_e_1(TildesOut)[0][0] + 1j*G_e_1(TildesOut)[1][0]]])
+    G_res = np.array([[G_h_0(TildesOut)[0][0] + 1j*G_h_0(TildesOut)[1][0], G_h_1(TildesOut)[0][0] + 1j*G_h_1(TildesOut)[1][0]],[ G_e_0(TildesOut)[0][0] + 1j*G_e_0(TildesOut)[1][0], G_e_1(TildesOut)[0][0] + 1j*G_e_1(TildesOut)[1][0]]])
     Sigma = np.array([[sigma_h_0(TildesOut)[0][0] + 1j*sigma_h_0(TildesOut)[1][0], sigma_h_1(TildesOut)[0][0] + 1j*sigma_h_1(TildesOut)[1][0]],[sigma_e_0(TildesOut)[0][0] + 1j*sigma_e_0(TildesOut)[1][0], sigma_e_1(TildesOut)[0][0] + 1j*sigma_e_1(TildesOut)[1][0]]]);
 
-    return TildesOut, G, Sigma
-'''
-
-def unnormalised_Delta_from_tildes(tildes, Gamma):
-    # return Delta_e and Delta_h from a 1*3 array of [omega_tilde, Deltatilde_h, Deltatilde_e] under impurity level Gamma
-    omega_tilde, Deltatilde_h, Deltatilde_e = tildes
-    Delta_h = Deltatilde_h - sigma_h_1(tildes, Gamma) - sigma_e_1(tildes, Gamma)
-    Delta_e = Deltatilde_e - sigma_h_1(tildes, Gamma) - sigma_e_1(tildes, Gamma) 
-    omega_n = omega_tilde - sigma_h_0(tildes, Gamma) - sigma_h_0(tildes, Gamma)
-    return omega_n, Delta_h, Delta_e
+    return TildesOut, G_res, Sigma
 
 def G_and_Sigma(omega,Delta_h,Delta_e,Gamma):
-    # ??? Why does this assume Delta_h has the same shape as omega. I thought we should only have one value of unnormalised Delta_h and unnormalised Delta_e, but a list of Matsubara frequencies omega. I assumed this is just a weird feature and continue. 
-    # returns the Green's function and self-energy, and normalised order parameters given the Matsubara frequencies and unnormalised gap size
-    omega_arr0 = []; G_arr0 = []; Sigma_arr0 = []; Omega_Tilde = []; Delta_Tilde = [];
+    # omega = 1D array; Delta_h, Delta_e, Gamma = float
+    # returns the Green's function and self-energy, and normalised order parameters given frequencies to evaluate the green's functions at and unnormalised gap size. omega can be either real (Matsubara frequencies) or complex (general frequencies)
+    # returns G_arr and Sigma_arr are N*2*2 arrays, Omega_Tilde and Delta_Tilde are size N 1D array
+    use_complex_frequency = np.any(np.iscomplex(omega)) # determine whether complex or real frequencies are used
+
+    G_arr0 = np.zeros((len(omega), 2, 2),dtype = np.complex128)
+    Sigma_arr0 = np.zeros((len(omega), 2, 2),dtype = np.complex128)
+    Omega_Tilde = np.zeros(len(omega),dtype = np.complex128)
+    Delta_Tilde = np.zeros((len(omega), 2),dtype = np.complex128)
 
     for i in range(len(omega)):
-        Tildesout,G,Sigma = SigmaCorrections(omega[i],Delta_h[i],Delta_e[i],Gamma);
-        Omega_Tilde.append(Tildesout[0])
-        Delta_Tilde.append([Tildesout[1],Tildesout[2]])
-        G_arr0.append(G.tolist())
-        Sigma_arr0.append(Sigma.tolist())
+        if use_complex_frequency:
+            Tildesout,G_res,Sigma = SigmaCorrections_complex(omega[i],Delta_h,Delta_e,Gamma)
+        else:
+            Tildesout,G_res,Sigma = SigmaCorrections(omega[i],Delta_h,Delta_e,Gamma)
+        
+        Omega_Tilde[i] = (Tildesout[0]) # store the 
+        Delta_Tilde[i] = ([Tildesout[1],Tildesout[2]])
+        G_arr0[i] = G_res
+        Sigma_arr0[i] = Sigma
 
-    omega_arr = np.array(omega_arr0)
-    G_arr = np.array(G_arr0)
-    Sigma_arr = np.array(Sigma_arr0)
-    Omega_Tilde = np.array(Omega_Tilde)
-    Delta_Tilde = np.array(Delta_Tilde)
-
-    return G_arr, Sigma_arr, Omega_Tilde, Delta_Tilde
-
-
+    return G_arr0, Sigma_arr0, Omega_Tilde, Delta_Tilde
 
 def padecoeffs(z,u):
     #Calculate Pade approximant coefficients, following the procedure given in the appendix of Vidberg 1977
