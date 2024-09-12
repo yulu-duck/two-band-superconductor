@@ -254,6 +254,7 @@ def SolveGap_FPade(DeltaOut,temperature,Gamma,smartTruncate = True, N_FPade = No
                 N_FPade = np.minimum(50 + (0.10/temperature - 1) * 7,400)
         else:
             N_FPade = N_FPade_safe
+            print('N_FPade')
     # returns the unnormalised gaps DeltaOut and renormalised gaps Tildes given an initial guess of unnormalised gaps; with a cutoff N_FPade in the Pade-decomposed Matsubara summation
 
     try: # if running in IPython environment

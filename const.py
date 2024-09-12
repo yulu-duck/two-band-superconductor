@@ -25,6 +25,7 @@ Vee=1;
 Vhh=1;
 Ne=1e-3;
 Nh=2.6e-3;
+# Vhe = 0; Vee = 0; Ne = 0
 Ntot=Nh+Ne;
 
 Tmin = 2e-3
