@@ -10,6 +10,43 @@ curr_dir = os.path.dirname(os.path.realpath(__file__))
 """
 The script calculates and stores results of the gap equations with impurity.
 """
+initD = [1,-1]
+temp_arr = np.linspace(0.1, 0.01,20)
+Gamma = 0.2   
+Delta_h_list = []
+Delta_e_list = []
+Delta_h_FPade_list = []
+start_time = time.time()
+
+for i in range(len(temp_arr)):
+    temp = temp_arr[i]
+    DeltaOut, TildesTotal = SolveGap(initD,temp,Gamma)
+
+    gaps_FPade = SolveGap_FPade(initD, temp, Gamma, N_FPade=500)[0][0]
+
+    Delta_h_list.append(DeltaOut[0])
+    Delta_e_list.append(DeltaOut[1])
+    Delta_h_FPade_list.append(gaps_FPade)
+
+    end_time = time.time()
+    formatted_time = str(timedelta(seconds= (end_time - start_time)))
+    print(f'DeltaOut: {DeltaOut}')
+    print(f'{i} out of {len(temp_arr)} Gamma values completed. Cumulative time: {formatted_time}.')
+
+
+print(f'Delta_h_list:{Delta_h_list}')
+print(f'Delta_e_list:{Delta_e_list}')
+
+np.savetxt(curr_dir+'/gaps_0916_naive_lowT.txt',Delta_h_list)
+
+plt.plot(temp_arr, Delta_h_list, label = 'Naive')
+plt.plot(temp_arr, Delta_h_FPade_list, label = 'FPade')
+plt.legend(loc = 'best')
+plt.xlabel('T/K')
+plt.ylabel('Delta_h')
+plt.title('Order parameters calculated with partial sum and Pade decomposition at Gamma = 0.2')
+plt.show()
+"""
 savePlot = True
 Gamma_arr = np.linspace(0.0,0.20, 10)
 Gamma_arr = np.array([0])
@@ -60,3 +97,4 @@ for i in range(len(Gamma_arr)): # smart guess
 # Save the DataFrame to a text file
 output_file = curr_dir+'/Gaps_0912/gaps_one_band.txt'
 save_df.to_csv(output_file, sep='\t', index=False, header=True)
+"""
