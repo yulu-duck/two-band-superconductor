@@ -1,0 +1,2 @@
+gapeqn.py - To run this, move it to the main folder. Max used this to solve the gap equations near the real axis (dynamical. he did an additional Wick's rotation and called it the 'imaginary axis') and analytically continued it onto the real axis. It's a bit slow. 
+Tc_calc.py and Tc_calc_brute_force.py are also his legacy which outputs Tc.txt that we can use as 0th order approximation in calculation, but they didn't help a lot.
